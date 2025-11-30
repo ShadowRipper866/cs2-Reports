@@ -452,8 +452,6 @@ bool Reports::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool 
     ConVar_Register(FCVAR_SERVER_CAN_EXECUTE | FCVAR_GAMEDLL);
     g_SMAPI->AddListener(this, this);
 
-    LoadConfig();
-
     return true;
 }
 
