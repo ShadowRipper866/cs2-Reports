@@ -23,6 +23,9 @@ SH_DECL_HOOK0_void(IServerGameDLL, GameServerSteamAPIActivated, SH_NOATTRIB, 0);
 
 bool isCustomReason[MAX_PLAYERS];
 int pendingTarget[MAX_PLAYERS];
+time_t cooldownTimeStamp[MAX_PLAYERS];
+int cooldown;
+
 map<string, string> phrases;
 vector<string> reportReasons;
 map<int, ReportReasonParams> rParams;
@@ -112,7 +115,7 @@ void LoadConfig() {
     KeyValues *config = new KeyValues("Config");
     const char *path = "addons/configs/reports/reports.ini";
     if (!config->LoadFromFile(g_pFullFileSystem, path)) {
-        utils->ErrorLog("[%s] Failed to load: %s", g_PLAPI->GetLogTag(), path);
+        utils->ErrorLog("%s Failed to load: %s", g_PLAPI->GetLogTag(), path);
         delete config;
         return;
     }
@@ -138,6 +141,7 @@ void LoadConfig() {
     ip = config->GetString("server_ip");
     wColor = hex_to_int(config->GetString("Webhook_color"));
     wDescription = config->GetString("webhook_description");
+    cooldown = config->GetInt("cooldown", 30);
     delete config;
 }
 
@@ -150,6 +154,18 @@ bool CheckPrime(uint64 SteamID)
 
 const char* GetTranslation(const char* key) {
     return phrases[string(key)].c_str();
+}
+
+bool CheckCooldown(int slot) {
+    if (cooldownTimeStamp[slot] != 0) {
+        if (time(0) < cooldownTimeStamp[slot] + cooldown) {
+            utils->PrintToChat(slot, GetTranslation("Player_ReportCooldown"));
+            return true;
+        }
+        cooldownTimeStamp[slot] = 0;
+        return false;
+    }
+    return false;
 }
 
 bool OnPlayerReportCommand(int slot, const char* content) {
@@ -223,6 +239,7 @@ void SelectReasonMenu(int slot, int target) {
 }
 
 void SendReport(int slot, int target, const char* reason) {
+    if (CheckCooldown(slot)) return;
     const char* reporterName = players_api->GetPlayerName(slot);
     const char* victimName = players_api->GetPlayerName(target);
 
@@ -232,6 +249,7 @@ void SendReport(int slot, int target, const char* reason) {
     }
     SendWebhookToDiscord(wDescription.c_str(), slot, target, reason, victimName, reporterName);
     utils->PrintToChat(slot, GetTranslation("Player_reportSentSuccessfully"));
+    cooldownTimeStamp[slot] = time(0);
 }
 
 void SendWebhookAsync(const string& webhookUrl, const string& jsonData) {
@@ -420,6 +438,7 @@ void OnPlayerConnect(const char* szName, IGameEvent* pEvent, bool bDontBroadcast
     int iSlot = pEvent->GetInt("userid");
     isCustomReason[iSlot] = false;
     pendingTarget[iSlot] = -1;
+    cooldownTimeStamp[iSlot] = 0;
 }
 
 void Reports::OnGameServerSteamAPIActivated()
@@ -451,7 +470,6 @@ bool Reports::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool 
 
     ConVar_Register(FCVAR_SERVER_CAN_EXECUTE | FCVAR_GAMEDLL);
     g_SMAPI->AddListener(this, this);
-
     return true;
 }
 
