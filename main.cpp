@@ -231,6 +231,7 @@ void SelectReasonMenu(int slot, int target) {
                 const char* reasonText = it->second.text.c_str();
                 dbgmsg(reasonText);
                 SendReport(iSlot, target, reasonText);
+                menus_api->ClosePlayerMenu(iSlot);
             }
         }
         else if (iItem == 7) admin_api->ShowAdminLastCategoryMenu(iSlot);
@@ -455,6 +456,23 @@ CON_COMMAND_F(mm_reports_config_reload, "", FCVAR_SERVER_CAN_EXECUTE) {
     META_CONPRINTF("%s Configuration reloaded successfully.\n", g_PLAPI->GetLogTag());
 }
 
+void LoadTranslations() {
+    KeyValues* g_kvPhrases = new KeyValues("Phrases");
+    const char *pszPath = "addons/translations/reports.phrases.txt";
+
+    if (!g_kvPhrases->LoadFromFile(g_pFullFileSystem, pszPath))
+    {
+        utils->ErrorLog("[%s] Failed to load %s", g_PLAPI->GetLogTag(), pszPath);
+        return;
+    }
+
+    const char* language = utils->GetLanguage();
+    for (KeyValues *pKey = g_kvPhrases->GetFirstTrueSubKey(); pKey; pKey = pKey->GetNextTrueSubKey()) {
+        phrases[string(pKey->GetName())] = string(pKey->GetString(language));
+    }
+    delete g_kvPhrases;
+}
+
 bool Reports::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late)
 {
     PLUGIN_SAVEVARS();
@@ -513,26 +531,13 @@ void Reports::AllPluginsLoaded()
     }
     utils->StartupServer(g_PLID, StartupServer);
     LoadConfig();
+    LoadTranslations();
     utils->RegCommand(g_PLID, {"mm_report"}, {"!report"}, OnPlayerReportCommand);
     utils->HookEvent(g_PLID, "player_chat", OnPlayerCustomReason);
     utils->HookEvent(g_PLID, "player_connect_full", OnPlayerConnect);
     players_api->HookOnClientAuthorized(g_PLID, [](int slot, uint64 sid)
     {
         isCustomReason[slot] = false;
-        KeyValues* g_kvPhrases = new KeyValues("Phrases");
-        const char *pszPath = "addons/translations/reports.phrases.txt";
-
-        if (!g_kvPhrases->LoadFromFile(g_pFullFileSystem, pszPath))
-        {
-            utils->ErrorLog("[%s] Failed to load %s", g_PLAPI->GetLogTag(), pszPath);
-            return;
-        }
-
-        const char* language = utils->GetLanguage();
-        for (KeyValues *pKey = g_kvPhrases->GetFirstTrueSubKey(); pKey; pKey = pKey->GetNextTrueSubKey()) {
-            phrases[string(pKey->GetName())] = string(pKey->GetString(language));
-        }
-        delete g_kvPhrases;
     });
     pluginLoaded = true;
 }
@@ -546,27 +551,4 @@ bool Reports::Unload(char *error, size_t maxlen)
     return true;
 }
 
-const char *Reports::GetAuthor() {
-    return "ShadowRipper";
-}
-const char *Reports::GetDate() {
-    return __DATE__;
-}
-const char *Reports::GetDescription() {
-    return "Simple plugin for reports";
-}
-const char *Reports::GetLicense() {
-    return "Free";
-}
-const char *Reports::GetLogTag() {
-    return "[REPORTS]";
-}
-const char *Reports::GetName() {
-    return "Report System";
-}
-const char *Reports::GetURL() {
-    return "";
-}
-const char *Reports::GetVersion() {
-    return "1.0";
-}
+
