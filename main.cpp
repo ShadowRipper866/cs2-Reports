@@ -551,4 +551,42 @@ bool Reports::Unload(char *error, size_t maxlen)
     return true;
 }
 
+const char* Reports::GetLicense()
+{
+    return "Free";
+}
 
+const char* Reports::GetVersion()
+{
+    return "1.0.2";
+}
+
+const char* Reports::GetDate()
+{
+    return __DATE__;
+}
+
+const char *Reports::GetLogTag()
+{
+    return "[REPORTS]";
+}
+
+const char* Reports::GetAuthor()
+{
+    return "ShadowRipper";
+}
+
+const char* Reports::GetDescription()
+{
+    return "";
+}
+
+const char* Reports::GetName()
+{
+    return "Report System";
+}
+
+const char* Reports::GetURL()
+{
+    return "";
+}
