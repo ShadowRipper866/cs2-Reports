@@ -170,8 +170,6 @@ bool CheckCooldown(int slot) {
 
 bool OnPlayerReportCommand(int slot, const char* content) {
     Menu menu;
-    string reason = content;
-    dbgmsg(reason);
     menus_api->SetTitleMenu(menu, GetTranslation("Menu_SelectPlayerTitle"));
     bool hasPlayers = false;
     for (int i = 0; i < MAX_PLAYERS; i++) {
@@ -179,8 +177,12 @@ bool OnPlayerReportCommand(int slot, const char* content) {
         if (bDebug || (i != slot)) {
             const char *playerName = players_api->GetPlayerName(i);
             if (players_api->IsConnected(i)) {
-                if (admin_api->HasPermission(i, adminImmunityFlag) && !bDebug) shouldAdd = false;
-                else shouldAdd = true;
+                if (admin_api != nullptr) {
+                    if (admin_api->HasPermission(i, adminImmunityFlag) && !bDebug)
+                        shouldAdd = false;
+                }
+                else
+                    shouldAdd = true;
             }
             if (shouldAdd) {
                 menus_api->AddItemMenu(menu, to_string(i).c_str(), playerName);
@@ -188,8 +190,9 @@ bool OnPlayerReportCommand(int slot, const char* content) {
             }
         }
     }
-    if (!hasPlayers) menus_api->AddItemMenu(menu, "", admin_api->GetTranslation("NoPlayers"), ITEM_DISABLED);
-    menus_api->SetBackMenu(menu, true);
+    if (!hasPlayers)
+        menus_api->AddItemMenu(menu, "", GetTranslation("NoPlayers"), ITEM_DISABLED);
+    menus_api->SetBackMenu(menu, false);
     menus_api->SetExitMenu(menu, true);
 
     menus_api->SetCallback(menu, [](const char* szBack, const char* szFront, int iItem, int iSlot) {
@@ -198,7 +201,6 @@ bool OnPlayerReportCommand(int slot, const char* content) {
             pendingTarget[iSlot] = target;  // Set pending target here
             SelectReasonMenu(iSlot, target);
         }
-        else if (iItem == 7) admin_api->ShowAdminLastCategoryMenu(iSlot);
     });
     menus_api->DisplayPlayerMenu(menu, slot, true, true);
     return true;
@@ -218,9 +220,13 @@ void SelectReasonMenu(int slot, int target) {
     menus_api->SetBackMenu(menu, true);
     menus_api->SetExitMenu(menu, true);
     menus_api->SetCallback(menu, [target](const char* szBack, const char* szFront, int iItem, int iSlot) {
-        if (szBack && strcmp(szBack, "custom") == 0) {
+        if (szBack && !strcmp(szBack, "custom")) {
             isCustomReason[iSlot] = true;
             utils->PrintToChat(iSlot, GetTranslation("Player_customReasonGuide"));
+            return;
+        }
+        if (!strcmp(szBack, "back")) {
+            OnPlayerReportCommand(iSlot, "");
             return;
         }
         if (iItem < 7) {
@@ -234,7 +240,6 @@ void SelectReasonMenu(int slot, int target) {
                 menus_api->ClosePlayerMenu(iSlot);
             }
         }
-        else if (iItem == 7) admin_api->ShowAdminLastCategoryMenu(iSlot);
     });
     menus_api->DisplayPlayerMenu(menu, slot, true, true);
 }
@@ -524,10 +529,8 @@ void Reports::AllPluginsLoaded()
     admin_api = (IAdminApi *)g_SMAPI->MetaFactory(Admin_INTERFACE, &ret, NULL);
     if (ret == META_IFACE_FAILED)
     {
-        utils->ErrorLog("[%s] Missing Admin system plugin", g_PLAPI->GetLogTag());
-        string sBuffer = "meta unload "+to_string(g_PLID);
-        engine->ServerCommand(sBuffer.c_str());
-        return;
+        META_CONPRINTF("%s [WARNING] Missing Admin system plugin. No Immunity for admins!\n", g_PLAPI->GetLogTag());
+        admin_api = nullptr;
     }
     utils->StartupServer(g_PLID, StartupServer);
     LoadConfig();
@@ -558,7 +561,7 @@ const char* Reports::GetLicense()
 
 const char* Reports::GetVersion()
 {
-    return "1.0.2";
+    return "1.0.3";
 }
 
 const char* Reports::GetDate()
