@@ -50,18 +50,18 @@ CGameEntitySystem* GameEntitySystem()
 }
 
 uint32_t hex_to_int(const string& hex_str) {
-    std::string cleaned = hex_str;
+    string cleaned = hex_str;
     if (cleaned[0] == '#') {
         cleaned = cleaned.substr(1);
     }
     if (cleaned.length() != 6) {
-        throw invalid_argument("Incorrect format: RRGGBB excepted.");
+        META_CONPRINTF("%s Incorrect format: RRGGBB excepted.", g_PLAPI->GetLogTag());
     }
     uint32_t result;
-    std::stringstream ss;
+    stringstream ss;
     ss << hex << cleaned;
     if (!(ss >> result)) {
-        throw invalid_argument("Incorrect HEX-format");
+        META_CONPRINTF("%s Incorrect HEX-format", g_PLAPI->GetLogTag());
     }
     return result;
 }
@@ -180,6 +180,8 @@ bool OnPlayerReportCommand(int slot, const char* content) {
                 if (admin_api != nullptr) {
                     if (admin_api->HasPermission(i, adminImmunityFlag) && !bDebug)
                         shouldAdd = false;
+                    else
+                        shouldAdd = true;
                 }
                 else
                     shouldAdd = true;
@@ -444,7 +446,6 @@ void OnPlayerConnect(const char* szName, IGameEvent* pEvent, bool bDontBroadcast
     int iSlot = pEvent->GetInt("userid");
     isCustomReason[iSlot] = false;
     pendingTarget[iSlot] = -1;
-    cooldownTimeStamp[iSlot] = 0;
 }
 
 void Reports::OnGameServerSteamAPIActivated()
@@ -538,10 +539,6 @@ void Reports::AllPluginsLoaded()
     utils->RegCommand(g_PLID, {"mm_report"}, {"!report"}, OnPlayerReportCommand);
     utils->HookEvent(g_PLID, "player_chat", OnPlayerCustomReason);
     utils->HookEvent(g_PLID, "player_connect_full", OnPlayerConnect);
-    players_api->HookOnClientAuthorized(g_PLID, [](int slot, uint64 sid)
-    {
-        isCustomReason[slot] = false;
-    });
     pluginLoaded = true;
 }
 
@@ -561,7 +558,7 @@ const char* Reports::GetLicense()
 
 const char* Reports::GetVersion()
 {
-    return "1.0.3";
+    return "1.0.4";
 }
 
 const char* Reports::GetDate()
